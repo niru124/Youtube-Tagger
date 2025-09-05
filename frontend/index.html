@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Topic Dataset Frontend</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>YouTube Topic Dataset</h1>
+
+    <section id="add-video">
+        <h2>Add Video</h2>
+        <input type="text" id="video-url" placeholder="YouTube URL">
+        <input type="text" id="video-title" placeholder="Title (optional)">
+        <button onclick="addVideo()">Add Video</button>
+        <div id="add-result"></div>
+    </section>
+
+    <section id="video-topics">
+        <h2>Video Topics</h2>
+        <input type="text" id="video-id" placeholder="YouTube Video ID or URL">
+        <button onclick="getTopics()">Get Topics</button>
+        <div id="topics-list"></div>
+    </section>
+
+    <section id="vote-topic">
+        <h2>Vote on Topic</h2>
+        <input type="text" id="vote-video-id" placeholder="YouTube Video ID or URL">
+        <input type="text" id="topic-name" placeholder="Topic Name (optional)">
+        <input type="number" id="topic-id-vote" placeholder="Topic ID (optional, overrides name)">
+        
+        <select id="vote-type">
+            <option value="1">Upvote</option>
+            <option value="-1">Downvote</option>
+            <option value="0">Remove Vote</option>
+        </select>
+        <button onclick="voteTopic()">Vote</button>
+        <div id="vote-result"></div>
+    </section>
+
+    <section id="similar-videos">
+        <h2>Similar Videos</h2>
+        <input type="text" id="similar-video-id" placeholder="YouTube Video ID or URL">
+        <button onclick="getSimilar()">Get Similar</button>
+        <div id="similar-list"></div>
+    </section>
+
+    <section id="user-stats">
+        <h2>User Stats</h2>
+        <input type="text" id="stats-user-id" placeholder="User ID">
+        <button onclick="getUserStats()">Get Stats</button>
+        <div id="user-stats-result"></div>
+    </section>
+
+    <section id="contributions">
+        <h2>User Contributions</h2>
+        <button onclick="getContributions()">Get Contributions</button>
+        <div id="contributions-list"></div>
+    </section>
+
+    <script src="script.js"></script>
+</body>
+</html>

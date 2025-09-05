@@ -1,0 +1,41 @@
+# C++
+*.o
+*.obj
+*.ko
+*.lo
+*.la
+*.so
+*.a
+*.dll
+*.lib
+*.mod
+*.sym
+*.dwo
+*.elf
+*.prx
+*.bin
+*.hex
+*.gsom
+*.qvto
+*.gen
+
+# Build artifacts
+/cpp_backend/build/
+/cpp_backend/CMakeFiles/
+/cpp_backend/CMakeCache.txt
+/cpp_backend/cmake_install.cmake
+/cpp_backend/Makefile
+/cpp_backend/youtube-topic-crow
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependencies
+node_modules/
