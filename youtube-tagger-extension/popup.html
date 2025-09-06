@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>YouTube Tagger</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      width: 300px;
+      padding: 10px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+
+    input[type="text"],
+    textarea {
+      width: calc(100% - 12px);
+      padding: 5px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+    }
+
+    button {
+      background-color: #007bff;
+      color: white;
+      padding: 8px 15px;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    #status {
+      margin-top: 10px;
+      font-size: 0.9em;
+      color: green;
+    }
+
+    .error {
+      color: red;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>Tag YouTube Video</h2>
+  <label for="videoUrl">Video URL:</label>
+  <input type="text" id="videoUrl" readonly />
+
+  <label for="tags">Tags (comma-separated):</label>
+  <textarea id="tags" rows="4" placeholder="e.g., programming, tutorial, python"></textarea>
+  <div id="suggestions" style="border: 1px solid #eee; max-height: 100px; overflow-y: auto; margin-bottom: 10px; display: none;"></div>
+
+  <button id="submitTags">Submit Tags</button>
+  <div id="status"></div>
+
+  <script src="popup.js"></script>
+</body>
+
+</html>

@@ -3,7 +3,7 @@
 // Helper to extract YouTube video ID
 std::string getYouTubeVideoId(const std::string& url) {
     // Corrected regex escape sequences
-    std::regex regExp("^(?:https?://)?(?:www\\.)?(?:m\\.)?(?:youtube\\.com|youtu\\.be)/(?:watch\\?v=|embed/|v/|)([^&?\\n]{11})");
+    std::regex regExp("(?:https?://[^/]+/)?(?:https?://)?(?:www\\.)?(?:m\\.)?(?:youtube\\.com|youtu\\.be)/(?:watch\\?v=|embed/|v/|)([^&?\\n]{11})");
     std::smatch match;
     if (std::regex_search(url, match, regExp) && match.size() > 1) {
         return match[1].str();
