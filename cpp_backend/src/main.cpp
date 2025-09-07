@@ -123,8 +123,7 @@ int main() {
 
         try {
             db.upsertUser(userId);
-            mysql_query(db.getConnection(), "START TRANSACTION");
-            std::cerr << "  Transaction started." << std::endl;
+            std::cerr << "  User upserted." << std::endl;
 
             if (!topicName.empty()) {
                 nlohmann::json existingTopic = db.getTopicByName(topicName);
@@ -132,8 +131,7 @@ int main() {
                     std::cerr << "  Topic '" << topicName << "' not found. Inserting new topic." << std::endl;
                     topicId = db.insertTopic(topicName);
                     if (topicId == 0) {
-                        mysql_query(db.getConnection(), "ROLLBACK");
-                        std::cerr << "  Error: Failed to create new topic. Transaction rolled back." << std::endl;
+                        std::cerr << "  Error: Failed to create new topic." << std::endl;
                         nlohmann::json error_json;
                         error_json["error"] = "Failed to create new topic.";
                         return crow::response(500, error_json.dump());
@@ -144,8 +142,7 @@ int main() {
                     std::cerr << "  Topic '" << topicName << "' found with ID: " << topicId << std::endl;
                 }
             } else if (topicId == 0) {
-                mysql_query(db.getConnection(), "ROLLBACK");
-                std::cerr << "  Error: Topic name or topic ID is required. Transaction rolled back." << std::endl;
+                std::cerr << "  Error: Topic name or topic ID is required." << std::endl;
                 nlohmann::json error_json;
                 error_json["error"] = "Topic name or topic ID is required.";
                 return crow::response(400, error_json.dump());
@@ -158,8 +155,7 @@ int main() {
                 if (currentVote == desiredVote) {
                     // User is toggling off their vote
                     db.deleteVideoTopicVote(videoId, topicId, userId);
-                    mysql_query(db.getConnection(), "COMMIT");
-                    std::cerr << "  Vote removed. Transaction committed." << std::endl;
+                    std::cerr << "  Vote removed." << std::endl;
                     nlohmann::json success_json;
                     success_json["message"] = "Vote removed successfully";
                     success_json["user_id"] = userId;
@@ -167,8 +163,7 @@ int main() {
                 } else {
                     // User is changing their vote (e.g., from +1 to -1, or -1 to +1)
                     db.updateVideoTopicVote(videoId, topicId, userId, desiredVote);
-                    mysql_query(db.getConnection(), "COMMIT");
-                    std::cerr << "  Vote updated to " << desiredVote << ". Transaction committed." << std::endl;
+                    std::cerr << "  Vote updated to " << desiredVote << "." << std::endl;
                     nlohmann::json success_json;
                     success_json["message"] = "Vote updated successfully";
                     success_json["user_id"] = userId;
@@ -177,8 +172,7 @@ int main() {
             } else {
                 // No existing vote, insert new vote
                 db.insertVideoTopicVote(videoId, topicId, userId, desiredVote);
-                mysql_query(db.getConnection(), "COMMIT");
-                std::cerr << "  New vote " << desiredVote << " recorded. Transaction committed." << std::endl;
+                std::cerr << "  New vote " << desiredVote << " recorded." << std::endl;
                 nlohmann::json success_json;
                 success_json["message"] = "Vote recorded successfully";
                 success_json["user_id"] = userId;
@@ -186,8 +180,7 @@ int main() {
             }
 
         } catch (const std::exception& e) {
-            mysql_query(db.getConnection(), "ROLLBACK");
-            
+            std::cerr << "  Error occurred: " << e.what() << std::endl;
             nlohmann::json error_json;
             error_json["error"] = e.what();
             return crow::response(500, error_json.dump());

@@ -7,13 +7,19 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Find Crow
 find_package(Crow REQUIRED)
 
-# Find MariaDB Client Library (manual search)
-find_path(MARIADB_INCLUDE_DIR NAMES mysql.h HINTS /usr/include/mysql /usr/include/mariadb)
-find_library(MARIADB_LIBRARY NAMES mariadbclient mariadb HINTS /usr/lib /usr/lib/mysql /usr/lib/mariadb)
+# Find PostgreSQL Client Library (libpqxx)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(PQXX REQUIRED libpqxx)
 
-if(NOT MARIADB_INCLUDE_DIR OR NOT MARIADB_LIBRARY)
-    message(FATAL_ERROR "Could not find MariaDB client library. Please ensure mariadb-clients is installed.")
+if(NOT PQXX_FOUND)
+    message(FATAL_ERROR "Could not find libpqxx. Please ensure libpqxx-dev (or similar) is installed.")
 endif()
+
+# Find OpenSSL
+find_package(OpenSSL REQUIRED)
+
+# Find ZLIB
+find_package(ZLIB REQUIRED)
 
 # Add nlohmann/json (header-only library)
 # You might need to install it via pacman: sudo pacman -S nlohmann-json
@@ -31,10 +37,10 @@ add_executable(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
     Crow::Crow
-    ${MARIADB_LIBRARY}
-    z
-    ssl
-    crypto
+    ${PQXX_LIBRARIES}
+    OpenSSL::SSL
+    OpenSSL::Crypto
+    ZLIB::ZLIB
 )
 
 # Include directories
@@ -42,5 +48,5 @@ target_include_directories(${PROJECT_NAME}
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     /usr/include/nlohmann # Assuming nlohmann/json is installed here
-    ${MARIADB_INCLUDE_DIR}
+    ${PQXX_INCLUDE_DIRS}
 )

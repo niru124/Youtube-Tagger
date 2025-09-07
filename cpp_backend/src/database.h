@@ -2,13 +2,14 @@
 #define DATABASE_H
 
 #include <memory>
-#include <mysql/mysql.h>
+#include <pqxx/pqxx>
+using namespace pqxx;
 #include <nlohmann/json.hpp>
 #include <string>
 
 class Database {
 private:
-  MYSQL *conn;
+  std::unique_ptr<pqxx::connection> conn;
 
   void connect();
   void createTables();
@@ -17,8 +18,8 @@ public:
   Database();
   ~Database();
 
-  // Get raw MYSQL connection for transactions
-  MYSQL *getConnection();
+   // Get PostgreSQL connection for database operations
+   pqxx::connection& getConnection();
 
   nlohmann::json getVideoById(const std::string &videoId);
   nlohmann::json insertVideo(const std::string &videoId,
