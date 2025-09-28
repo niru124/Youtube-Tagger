@@ -21,12 +21,16 @@ void Database::createTables() {
     try {
         pqxx::work txn(getConnection());
 
+        // Enable the vector extension
+        txn.exec("CREATE EXTENSION IF NOT EXISTS vector;");
+
         std::string create_videos_sql = R"(
             CREATE TABLE IF NOT EXISTS videos (
             id VARCHAR(255) PRIMARY KEY,
             title VARCHAR(255),
             upload_date VARCHAR(255),
-            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            vector_embedding VECTOR(1536)
             )
         )";
         txn.exec(create_videos_sql);
@@ -72,7 +76,7 @@ void Database::createTables() {
     }
 }
 
-Database::Database() {
+Database::Database() : thread_pool(4) {  // Initialize thread pool with 4 threads
     connect();
     createTables();
 
@@ -115,6 +119,13 @@ Database::Database() {
         "LIMIT 1");
     c.prepare("upsert_user", "INSERT INTO users (id, username) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username");
     c.prepare("upsert_user_no_username", "INSERT INTO users (id) VALUES ($1) ON CONFLICT (id) DO NOTHING");
+    c.prepare("update_video_embedding", "UPDATE videos SET vector_embedding = $1 WHERE id = $2");
+    c.prepare("get_video_embedding", "SELECT vector_embedding FROM videos WHERE id = $1");
+    c.prepare("get_similar_videos_by_vector",
+        "SELECT id, title, upload_date, last_updated, 1 - (vector_embedding <=> (SELECT vector_embedding FROM videos WHERE id = $1)) AS similarity "
+        "FROM videos "
+        "WHERE id != $1 AND vector_embedding IS NOT NULL "
+        "ORDER BY vector_embedding <=> (SELECT vector_embedding FROM videos WHERE id = $1) LIMIT $2");
 }
 
 Database::~Database() {
@@ -126,6 +137,40 @@ pqxx::connection& Database::getConnection() {
         throw std::runtime_error("Database connection is not open.");
     }
     return *conn;
+}
+
+void Database::updateVideoEmbedding(const std::string& videoId, const std::vector<float>& embedding) {
+    try {
+        pqxx::work txn(getConnection());
+        std::string embedding_str = formatVector(embedding);
+        txn.exec_prepared("update_video_embedding", embedding_str, videoId);
+        txn.commit();
+    } catch (const pqxx::sql_error &e) {
+        std::cerr << "Error in updateVideoEmbedding: " << e.what() << std::endl;
+        throw;
+    }
+}
+
+nlohmann::json Database::getSimilarVideosByVector(const std::string& videoId, int limit) {
+    nlohmann::json similar_videos = nlohmann::json::array();
+    try {
+        pqxx::work txn(getConnection());
+        pqxx::result r = txn.exec_prepared("get_similar_videos_by_vector", videoId, limit);
+
+        for (const auto& row : r) {
+            nlohmann::json video_data;
+            video_data["id"] = row["id"].as<std::string>();
+            video_data["title"] = row["title"].as<std::string>();
+            video_data["upload_date"] = row["upload_date"].as<std::string>();
+            video_data["last_updated"] = row["last_updated"].as<std::string>();
+            video_data["similarity"] = row["similarity"].as<double>();
+            similar_videos.push_back(video_data);
+        }
+    } catch (const pqxx::sql_error &e) {
+        std::cerr << "Error in getSimilarVideosByVector: " << e.what() << std::endl;
+        throw;
+    }
+    return similar_videos;
 }
 
 nlohmann::json Database::getVideoById(const std::string& videoId) {
@@ -405,4 +450,83 @@ void Database::upsertUser(const std::string &userId, const std::string &username
         std::cerr << "Error in upsertUser: " << e.what() << std::endl;
         throw;
     }
+}
+
+// Async implementations
+std::future<nlohmann::json> Database::getVideoByIdAsync(const std::string& videoId) {
+    return std::async(std::launch::async, [this, videoId]() {
+        return this->getVideoById(videoId);
+    });
+}
+
+std::future<nlohmann::json> Database::insertVideoAsync(const std::string& videoId, const std::string& title) {
+    return std::async(std::launch::async, [this, videoId, title]() {
+        return this->insertVideo(videoId, title);
+    });
+}
+
+std::future<nlohmann::json> Database::getTopicByNameAsync(const std::string& topicName) {
+    return std::async(std::launch::async, [this, topicName]() {
+        return this->getTopicByName(topicName);
+    });
+}
+
+std::future<int> Database::insertTopicAsync(const std::string& topicName) {
+    return std::async(std::launch::async, [this, topicName]() {
+        return this->insertTopic(topicName);
+    });
+}
+
+std::future<nlohmann::json> Database::getAggregatedTopicsForVideoAsync(const std::string& videoId) {
+    return std::async(std::launch::async, [this, videoId]() {
+        return this->getAggregatedTopicsForVideo(videoId);
+    });
+}
+
+std::future<nlohmann::json> Database::getSimilarVideosAsync(const std::string& videoId) {
+    return std::async(std::launch::async, [this, videoId]() {
+        return this->getSimilarVideos(videoId);
+    });
+}
+
+std::future<nlohmann::json> Database::getUserDetailsAsync(const std::string& userId) {
+    return std::async(std::launch::async, [this, userId]() {
+        return this->getUserDetails(userId);
+    });
+}
+
+std::future<int> Database::getUserSubmissionsCountAsync(const std::string& userId) {
+    return std::async(std::launch::async, [this, userId]() {
+        return this->getUserSubmissionsCount(userId);
+    });
+}
+
+std::future<std::string> Database::getUserLastSubmissionDateAsync(const std::string& userId) {
+    return std::async(std::launch::async, [this, userId]() {
+        return this->getUserLastSubmissionDate(userId);
+    });
+}
+
+std::future<nlohmann::json> Database::getUserMostFrequentTagAsync(const std::string& userId) {
+    return std::async(std::launch::async, [this, userId]() {
+        return this->getUserMostFrequentTag(userId);
+    });
+}
+
+std::future<void> Database::upsertUserAsync(const std::string& userId, const std::string& username) {
+    return std::async(std::launch::async, [this, userId, username]() {
+        this->upsertUser(userId, username);
+    });
+}
+
+std::future<void> Database::updateVideoEmbeddingAsync(const std::string& videoId, const std::vector<float>& embedding) {
+    return std::async(std::launch::async, [this, videoId, embedding]() {
+        this->updateVideoEmbedding(videoId, embedding);
+    });
+}
+
+std::future<nlohmann::json> Database::getSimilarVideosByVectorAsync(const std::string& videoId, int limit) {
+    return std::async(std::launch::async, [this, videoId, limit]() {
+        return this->getSimilarVideosByVector(videoId, limit);
+    });
 }

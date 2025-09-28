@@ -21,6 +21,9 @@ find_package(OpenSSL REQUIRED)
 # Find ZLIB
 find_package(ZLIB REQUIRED)
 
+# Find Boost
+find_package(Boost REQUIRED COMPONENTS system thread)
+
 # Add nlohmann/json (header-only library)
 # You might need to install it via pacman: sudo pacman -S nlohmann-json
 # Or, if not available, download and place it in a 'include' directory
@@ -41,6 +44,8 @@ target_link_libraries(${PROJECT_NAME}
     OpenSSL::SSL
     OpenSSL::Crypto
     ZLIB::ZLIB
+    Boost::system
+    Boost::thread
 )
 
 # Include directories
@@ -49,4 +54,5 @@ target_include_directories(${PROJECT_NAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     /usr/include/nlohmann # Assuming nlohmann/json is installed here
     ${PQXX_INCLUDE_DIRS}
+    ${Boost_INCLUDE_DIRS}
 )

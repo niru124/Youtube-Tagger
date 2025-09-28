@@ -1,6 +1,9 @@
 #include <crow.h>
 #include <crow/middlewares/cors.h>
 #include <nlohmann/json.hpp>
+#include <future>
+#include <boost/asio.hpp>
+#include <boost/asio/thread_pool.hpp>
 
 #include "config.h"
 #include "helpers.h"
@@ -25,9 +28,11 @@ int main() {
     // POST /videos: Add a new video with optional title
     // GET /videos/:id: Get a video by its ID
     CROW_ROUTE(app, "/videos/<string>").methods("GET"_method)([&](const crow::request& req, std::string videoId) {
-        std::cerr << "GET /videos/" << videoId << " received." << std::endl;
+        std::cerr << "GET /videos/" << videoId << " received (async)." << std::endl;
         try {
-            nlohmann::json video = db.getVideoById(videoId);
+            auto future = db.getVideoByIdAsync(videoId);
+            nlohmann::json video = future.get();
+
             if (video.is_null()) {
                 std::cerr << "Video " << videoId << " not found in DB." << std::endl;
                 return crow::response(404, nlohmann::json{{"error", "Video not found."}}.dump());
@@ -44,7 +49,7 @@ int main() {
         auto json_body = nlohmann::json::parse(req.body);
         std::string url = json_body.value("id", ""); // Frontend sends URL in 'id' field
         std::string title = json_body.value("title", "");
-        std::cerr << "POST /videos received. URL: " << url << ", Title: " << title << std::endl;
+        std::cerr << "POST /videos received (async). URL: " << url << ", Title: " << title << std::endl;
 
         if (url.empty()) {
             std::cerr << "Error: Video URL is required." << std::endl;
@@ -59,14 +64,17 @@ int main() {
         }
 
         try {
-            nlohmann::json existingVideo = db.getVideoById(youtubeId);
+            auto future = db.getVideoByIdAsync(youtubeId);
+            nlohmann::json existingVideo = future.get();
+
             if (!existingVideo.is_null()) {
                 std::cerr << "Video " << youtubeId << " already exists. Returning existing video." << std::endl;
                 return crow::response(200, existingVideo.dump());
             }
 
-            std::cerr << "Video " << youtubeId << " not found. Inserting new video." << std::endl;
-            nlohmann::json newVideo = db.insertVideo(youtubeId, title);
+            std::cerr << "Video " << youtubeId << " not found. Inserting new video (async)." << std::endl;
+            auto insertFuture = db.insertVideoAsync(youtubeId, title);
+            nlohmann::json newVideo = insertFuture.get();
             std::cerr << "New video inserted: " << newVideo.dump() << std::endl;
             return crow::response(201, newVideo.dump());
 
@@ -78,9 +86,10 @@ int main() {
 
     // GET /videos/:id/topics: Get topics and their aggregated votes for a video
     CROW_ROUTE(app, "/videos/<string>/topics").methods("GET"_method)([&](const crow::request& req, std::string videoId) {
-        std::cerr << "GET /videos/" << videoId << "/topics received." << std::endl;
+        std::cerr << "GET /videos/" << videoId << "/topics received (async)." << std::endl;
         try {
-            nlohmann::json topics = db.getAggregatedTopicsForVideo(videoId);
+            auto future = db.getAggregatedTopicsForVideoAsync(videoId);
+            nlohmann::json topics = future.get();
             nlohmann::json response_json;
             response_json["video_id"] = videoId;
             response_json["topics"] = topics;
@@ -187,12 +196,42 @@ int main() {
         }
     });
 
-    // GET /videos/:id/similar: Get similar videos based on shared topics
-    CROW_ROUTE(app, "/videos/<string>/similar").methods("GET"_method)([&](const crow::request& req, std::string videoId) {
+    // POST /videos/:id/embedding: Update a video's vector embedding
+    CROW_ROUTE(app, "/videos/<string>/embedding").methods("POST"_method)([&](const crow::request& req, std::string videoId) {
+        std::cerr << "POST /videos/" << videoId << "/embedding received." << std::endl;
         try {
-            nlohmann::json similar = db.getSimilarVideos(videoId);
+            auto json_body = nlohmann::json::parse(req.body);
+            std::vector<float> embedding = json_body.at("embedding").get<std::vector<float>>();
+
+            if (embedding.empty() || embedding.size() != 1536) { // Assuming 1536 dimensions
+                std::cerr << "Error: Invalid embedding size." << std::endl;
+                return crow::response(400, nlohmann::json{{"error", "Invalid embedding size. Expected 1536 dimensions."}}.dump());
+            }
+
+            db.updateVideoEmbeddingAsync(videoId, embedding);
+            std::cerr << "Embedding update initiated for video " << videoId << "." << std::endl;
+            return crow::response(202, nlohmann::json{{"message", "Embedding update accepted."}}.dump());
+        } catch (const std::exception& e) {
+            std::cerr << "Error in POST /videos/" << videoId << "/embedding: " << e.what() << std::endl;
+            return crow::response(500, nlohmann::json{{"error", e.what()}}.dump());
+        }
+    });
+
+    // GET /videos/:id/similar_by_vector: Get similar videos based on vector embedding
+    CROW_ROUTE(app, "/videos/<string>/similar_by_vector").methods("GET"_method)([&](const crow::request& req, std::string videoId) {
+        std::cerr << "GET /videos/" << videoId << "/similar_by_vector received." << std::endl;
+        try {
+            int limit = 10;
+            if (req.url_params.get("limit")) {
+                limit = std::stoi(req.url_params.get("limit"));
+            }
+
+            auto future = db.getSimilarVideosByVectorAsync(videoId, limit);
+            nlohmann::json similar = future.get();
+            std::cerr << "Returning vector-similar videos for " << videoId << ": " << similar.dump() << std::endl;
             return crow::response(200, similar.dump());
         } catch (const std::exception& e) {
+            std::cerr << "Error in GET /videos/" << videoId << "/similar_by_vector: " << e.what() << std::endl;
             return crow::response(500, nlohmann::json{{"error", e.what()}}.dump());
         }
     });
@@ -200,14 +239,22 @@ int main() {
     // GET /users/:id/stats: Get user statistics
     CROW_ROUTE(app, "/users/<string>/stats").methods("GET"_method)([&](const crow::request& req, std::string userId) {
         try {
-            nlohmann::json userDetails = db.getUserDetails(userId);
+            auto userDetailsFuture = db.getUserDetailsAsync(userId);
+            nlohmann::json userDetails = userDetailsFuture.get();
+
             if (userDetails.is_null()) {
                 return crow::response(404, nlohmann::json{{"error", "User not found."}}.dump());
             }
 
-            int submissionsCount = db.getUserSubmissionsCount(userId);
-            std::string lastSubmissionDate = db.getUserLastSubmissionDate(userId);
-            nlohmann::json mostFrequentTag = db.getUserMostFrequentTag(userId);
+            // Launch all async operations concurrently
+            auto submissionsFuture = db.getUserSubmissionsCountAsync(userId);
+            auto lastDateFuture = db.getUserLastSubmissionDateAsync(userId);
+            auto tagFuture = db.getUserMostFrequentTagAsync(userId);
+
+            // Wait for all to complete
+            int submissionsCount = submissionsFuture.get();
+            std::string lastSubmissionDate = lastDateFuture.get();
+            nlohmann::json mostFrequentTag = tagFuture.get();
 
             nlohmann::json response_json;
             response_json["user_id"] = userDetails["id"];
