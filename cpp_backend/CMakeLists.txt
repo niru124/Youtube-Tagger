@@ -4,8 +4,11 @@ project(youtube-topic-crow)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Use Boost.ASIO for Crow
+add_definitions(-DCROW_USE_BOOST)
+
 # Find Crow
-find_package(Crow REQUIRED)
+
 
 # Find PostgreSQL Client Library (libpqxx)
 find_package(PkgConfig REQUIRED)
@@ -39,7 +42,7 @@ add_executable(${PROJECT_NAME}
 # Link libraries
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
-    Crow::Crow
+    
     ${PQXX_LIBRARIES}
     OpenSSL::SSL
     OpenSSL::Crypto
@@ -55,4 +58,5 @@ target_include_directories(${PROJECT_NAME}
     /usr/include/nlohmann # Assuming nlohmann/json is installed here
     ${PQXX_INCLUDE_DIRS}
     ${Boost_INCLUDE_DIRS}
+    /usr/local/include/crow
 )

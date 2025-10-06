@@ -1,4 +1,4 @@
-#include <crow.h>
+#include <crow/crow.h>
 #include <crow/middlewares/cors.h>
 #include <nlohmann/json.hpp>
 #include <future>
@@ -28,10 +28,9 @@ int main() {
     // POST /videos: Add a new video with optional title
     // GET /videos/:id: Get a video by its ID
     CROW_ROUTE(app, "/videos/<string>").methods("GET"_method)([&](const crow::request& req, std::string videoId) {
-        std::cerr << "GET /videos/" << videoId << " received (async)." << std::endl;
+        std::cerr << "GET /videos/" << videoId << " received." << std::endl;
         try {
-            auto future = db.getVideoByIdAsync(videoId);
-            nlohmann::json video = future.get();
+            nlohmann::json video = db.getVideoById(videoId);
 
             if (video.is_null()) {
                 std::cerr << "Video " << videoId << " not found in DB." << std::endl;
@@ -202,8 +201,9 @@ int main() {
         try {
             auto json_body = nlohmann::json::parse(req.body);
             std::vector<float> embedding = json_body.at("embedding").get<std::vector<float>>();
+            std::cerr << "  Received embedding size: " << embedding.size() << std::endl;
 
-            if (embedding.empty() || embedding.size() != 1536) { // Assuming 1536 dimensions
+            if (embedding.empty() || embedding.size() != 384) { // Assuming 384 dimensions
                 std::cerr << "Error: Invalid embedding size." << std::endl;
                 return crow::response(400, nlohmann::json{{"error", "Invalid embedding size. Expected 1536 dimensions."}}.dump());
             }

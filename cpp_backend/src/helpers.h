@@ -17,6 +17,6 @@ std::string getYouTubeVideoId(const std::string& url);
 std::string generateUserId();
 
 // Helper to format a std::vector<float> into a string for pgvector
-std::string formatVector(const std::vector<float>& vec);
+std::string formatVectorForPgvector(const std::vector<float>& vec);
 
 #endif // HELPERS_H

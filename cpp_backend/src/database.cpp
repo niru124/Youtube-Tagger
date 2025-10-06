@@ -1,5 +1,6 @@
 #include "database.h"
 #include "config.h"
+#include "helpers.h" // Added for formatVector
 #include <iostream>
 #include <string>
 #include <memory>
@@ -24,13 +25,19 @@ void Database::createTables() {
         // Enable the vector extension
         txn.exec("CREATE EXTENSION IF NOT EXISTS vector;");
 
+        // Drop tables if they exist to ensure schema updates during development
+        txn.exec("DROP TABLE IF EXISTS video_topics CASCADE;");
+        txn.exec("DROP TABLE IF EXISTS videos CASCADE;");
+        txn.exec("DROP TABLE IF EXISTS topics CASCADE;");
+        txn.exec("DROP TABLE IF EXISTS users CASCADE;");
+
         std::string create_videos_sql = R"(
             CREATE TABLE IF NOT EXISTS videos (
             id VARCHAR(255) PRIMARY KEY,
             title VARCHAR(255),
             upload_date VARCHAR(255),
             last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            vector_embedding VECTOR(1536)
+            vector_embedding VECTOR(384)
             )
         )";
         txn.exec(create_videos_sql);
@@ -68,8 +75,11 @@ void Database::createTables() {
         )";
         txn.exec(create_users_sql);
 
+        // Create vector index for efficient similarity search
+        txn.exec("CREATE INDEX IF NOT EXISTS videos_vector_idx ON videos USING ivfflat (vector_embedding vector_cosine_ops);");
+
         txn.commit();
-        std::cout << "Database tables checked/created successfully." << std::endl;
+        std::cout << "Database tables and indexes checked/created successfully." << std::endl;
     } catch (const pqxx::sql_error &e) {
         std::cerr << "Error creating tables: " << e.what() << std::endl;
         throw;
@@ -122,10 +132,8 @@ Database::Database() : thread_pool(4) {  // Initialize thread pool with 4 thread
     c.prepare("update_video_embedding", "UPDATE videos SET vector_embedding = $1 WHERE id = $2");
     c.prepare("get_video_embedding", "SELECT vector_embedding FROM videos WHERE id = $1");
     c.prepare("get_similar_videos_by_vector",
-        "SELECT id, title, upload_date, last_updated, 1 - (vector_embedding <=> (SELECT vector_embedding FROM videos WHERE id = $1)) AS similarity "
-        "FROM videos "
-        "WHERE id != $1 AND vector_embedding IS NOT NULL "
-        "ORDER BY vector_embedding <=> (SELECT vector_embedding FROM videos WHERE id = $1) LIMIT $2");
+        "SELECT id, title, upload_date, last_updated, 1 - (vector_embedding <=> $1) AS similarity "
+        "FROM videos ");
 }
 
 Database::~Database() {
@@ -142,7 +150,7 @@ pqxx::connection& Database::getConnection() {
 void Database::updateVideoEmbedding(const std::string& videoId, const std::vector<float>& embedding) {
     try {
         pqxx::work txn(getConnection());
-        std::string embedding_str = formatVector(embedding);
+        std::string embedding_str = formatVectorForPgvector(embedding);
         txn.exec_prepared("update_video_embedding", embedding_str, videoId);
         txn.commit();
     } catch (const pqxx::sql_error &e) {
@@ -155,20 +163,33 @@ nlohmann::json Database::getSimilarVideosByVector(const std::string& videoId, in
     nlohmann::json similar_videos = nlohmann::json::array();
     try {
         pqxx::work txn(getConnection());
-        pqxx::result r = txn.exec_prepared("get_similar_videos_by_vector", videoId, limit);
+
+        // First, get the embedding of the target video
+        pqxx::result r_embedding = txn.exec_prepared("get_video_embedding", videoId);
+        if (r_embedding.empty() || r_embedding[0][0].is_null()) {
+            std::cerr << "Error: Embedding not found for video ID: " << videoId << std::endl;
+            return similar_videos; // Return empty if target embedding not found
+        }
+        std::string target_embedding_str = r_embedding[0][0].as<std::string>();
+        std::cerr << "  Target embedding for " << videoId << ": " << target_embedding_str.substr(0, 50) << "..." << std::endl; // Log first 50 chars
+
+        // Now, use this embedding to find similar videos
+        pqxx::result r = txn.exec_prepared("get_similar_videos_by_vector", target_embedding_str);
+        std::cerr << "  Executed get_similar_videos_by_vector for " << videoId << ", returned " << r.size() << " rows." << std::endl;
 
         for (const auto& row : r) {
             nlohmann::json video_data;
             video_data["id"] = row["id"].as<std::string>();
-            video_data["title"] = row["title"].as<std::string>();
-            video_data["upload_date"] = row["upload_date"].as<std::string>();
-            video_data["last_updated"] = row["last_updated"].as<std::string>();
+            video_data["title"] = row["title"].is_null() ? nullptr : row["title"].c_str();
+            video_data["upload_date"] = row["upload_date"].is_null() ? nullptr : row["upload_date"].c_str();
+            video_data["last_updated"] = row["last_updated"].is_null() ? nullptr : row["last_updated"].c_str();
             video_data["similarity"] = row["similarity"].as<double>();
             similar_videos.push_back(video_data);
         }
     } catch (const pqxx::sql_error &e) {
         std::cerr << "Error in getSimilarVideosByVector: " << e.what() << std::endl;
-        throw;
+        // It's important to return an empty JSON array in case of an error
+        return nlohmann::json::array();
     }
     return similar_videos;
 }
@@ -182,9 +203,9 @@ nlohmann::json Database::getVideoById(const std::string& videoId) {
             nlohmann::json video_data;
             const auto& row = r[0];
             video_data["id"] = row["id"].as<std::string>();
-            video_data["title"] = row["title"].as<std::string>();
-            video_data["upload_date"] = row["upload_date"].as<std::string>();
-            video_data["last_updated"] = row["last_updated"].as<std::string>();
+            video_data["title"] = row["title"].is_null() ? "" : row["title"].as<std::string>();
+            video_data["upload_date"] = row["upload_date"].is_null() ? "" : row["upload_date"].as<std::string>();
+            video_data["last_updated"] = row["last_updated"].is_null() ? "" : row["last_updated"].as<std::string>();
             return video_data;
         }
         return nlohmann::json();

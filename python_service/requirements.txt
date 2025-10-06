@@ -1,0 +1,5 @@
+Flask
+sentence-transformers
+psycopg2-binary
+numpy
+requests # For making HTTP requests to the C++ backend

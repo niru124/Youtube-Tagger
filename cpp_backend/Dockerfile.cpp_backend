@@ -1,0 +1,33 @@
+FROM ubuntu:22.04
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    libpqxx-dev \
+    libssl-dev \
+    zlib1g-dev \
+    libboost-system-dev \
+    libboost-thread-dev \
+    git \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Clone nlohmann/json and Crow if not available via apt
+RUN git clone https://github.com/nlohmann/json.git /usr/src/json \
+    && cp -r /usr/src/json/include/nlohmann /usr/local/include/ \
+    && git clone https://github.com/CrowCpp/Crow.git /usr/src/crow \
+    && mkdir -p /usr/local/include/crow \
+    && cp -r /usr/src/crow/include/. /usr/local/include/crow
+
+# Copy the C++ backend source code
+COPY . /app/cpp_backend
+WORKDIR /app/cpp_backend
+
+# Build the C++ backend
+RUN mkdir -p build \
+    && cmake -S . -B build \
+    && cmake --build build --target youtube-topic-crow
+
+# Command to run the application
+CMD ["./build/youtube-topic-crow"]

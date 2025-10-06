@@ -2,12 +2,18 @@
 
 // Helper to extract YouTube video ID
 std::string getYouTubeVideoId(const std::string& url) {
-    // Corrected regex escape sequences
-    std::regex regExp("(?:https?://[^/]+/)?(?:https?://)?(?:www\.)?(?:m\.)?(?:youtube\.com|youtu\.be)/(?:watch\?v=|embed/|v/|)([^&?\n]{11})");
-    std::smatch match;
-    if (std::regex_search(url, match, regExp) && match.size() > 1) {
-        return match[1].str();
+    size_t v_pos = url.find("v=");
+    if (v_pos != std::string::npos) {
+        std::string id = url.substr(v_pos + 2, 11);
+        if (id.length() == 11) return id;
     }
+
+    size_t youtu_be_pos = url.find("youtu.be/");
+    if (youtu_be_pos != std::string::npos) {
+        std::string id = url.substr(youtu_be_pos + 9, 11);
+        if (id.length() == 11) return id;
+    }
+
     return "";
 }
 
@@ -26,7 +32,7 @@ std::string generateUserId() {
 }
 
 // Helper to format a std::vector<float> into a string for pgvector
-std::string formatVector(const std::vector<float>& vec) {
+std::string formatVectorForPgvector(const std::vector<float>& vec) {
     std::stringstream ss;
     ss << "[";
     for (size_t i = 0; i < vec.size(); ++i) {

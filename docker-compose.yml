@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  postgres:
+    build:
+      context: .
+      dockerfile: Dockerfile.postgres
+    container_name: youtube_topics_postgres
+    environment:
+      POSTGRES_DB: youtube_topics
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  cpp_backend:
+     build:
+       context: ./cpp_backend
+       dockerfile: Dockerfile.cpp_backend
+     container_name: youtube_topics_cpp_backend
+     depends_on:
+       - postgres
+     ports:
+       - "8000:8000"
+     environment:
+       DB_HOST: postgres # Use the service name as the hostname
+       DB_PORT: 5432
+       DB_USER: testuser
+       DB_PASS: testpass
+       DB_NAME: youtube_topics
+     restart: on-failure
+
+volumes:
+  postgres_data:
