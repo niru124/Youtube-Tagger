@@ -10,32 +10,11 @@ The project uses Docker Compose to manage the PostgreSQL database and the C++ ba
 
 *   Docker and Docker Compose installed on your system.
 
-### Getting Started
-
-1.  **Navigate to the project root:**
-    ```bash
-    cd /home/nirantar/Downloads/seperate_1/youtube-topic-dataset/backend/ALGOBAAP
-    ```
-
-2.  **Build and run the Docker services:**
-    This command will build the custom PostgreSQL image (with `pgvector`) and the C++ backend service, then start both in detached mode.
-    ```bash
-    docker-compose up --build -d
-    ```
-
-## Project Setup
-
-The project uses Docker Compose to manage the PostgreSQL database and the C++ backend service.
-
-### Prerequisites
-
-*   Docker and Docker Compose installed on your system.
-
 ### Getting Started (Docker Compose)
 
 1.  **Navigate to the project root:**
     ```bash
-    cd /home/nirantar/Downloads/seperate_1/youtube-topic-dataset/backend/ALGOBAAP
+    cd /path/to/your/project/root
     ```
 
 2.  **Build and run the Docker services:**
@@ -103,7 +82,7 @@ If you prefer not to use Docker Compose, you can set up the PostgreSQL database 
 3.  **Build the C++ Backend:**
     Navigate to the `cpp_backend` directory and build the project:
     ```bash
-    cd /home/nirantar/Downloads/seperate_1/youtube-topic-dataset/backend/ALGOBAAP/cpp_backend
+    cd /path/to/your/project/root/cpp_backend
     mkdir -p build
     cmake -S . -B build
     cmake --build build --target youtube-topic-crow
